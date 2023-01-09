@@ -49,18 +49,20 @@ public class BotSmtp {
             socket.write("220 smtp.----.---- SMTP Ready\n");
 
             final StringBuilder dataStringBuilder = new StringBuilder();
-            final List<String> rcps = new ArrayList<>();
+            final List<String> to = new ArrayList<>();
+            final String[] from = new String[1];
 
             socket.handler(command -> {
-                System.out.println(command.toString());
+
                 if (command.toString().contains("EHLO")) {
                     socket.write("250-smtp.----.----\n");
                     socket.write("250-PIPELINING\n");
                     socket.write("250 8BITMIME\n");
                 } else if (command.toString().contains("MAIL FROM:")) {
+                    from[0] = command.toString();
                     socket.write("250 Sender ok\n");
                 } else if (command.toString().contains("RCPT TO:")) {
-                    rcps.add(command.toString());
+                    to.add(command.toString());
                     if (command.toString().contains("+bounce")) {
                         socket.write("550 5.1.1 Mailbox\n");
                     } else {
@@ -69,7 +71,7 @@ public class BotSmtp {
                 } else if (command.toString().contains("DATA")) {
                     socket.write("354 End data with <CR><LF>.<CR><LF>\n");
                 } else if (command.toString().contains("RSET")) {
-                    rcps.clear();
+                    to.clear();
                     dataStringBuilder.delete(0, dataStringBuilder.length());
                     socket.write("250 Ok\n");
                 } else if (command.toString().contains("QUIT")) {
@@ -78,6 +80,7 @@ public class BotSmtp {
                     dataStringBuilder.append(command.toString());
                     if (dataStringBuilder.substring(dataStringBuilder.length() - 5).equals("\r\n.\r\n")) {
                         socket.write("250 Ok\n");
+                        receivedMessage(from[0], to, dataStringBuilder.toString());
                     }
                 }
             });
@@ -85,7 +88,7 @@ public class BotSmtp {
             socket.closeHandler(unused -> {
                 numberOfConnections--;
                 try {
-                    generateComportemental(rcps, dataStringBuilder.toString());
+                    generateComportemental(to, dataStringBuilder.toString());
                 } catch (URISyntaxException e) {
                     throw new RuntimeException(e);
                 }
@@ -96,12 +99,18 @@ public class BotSmtp {
             return "We now have " + numberOfConnections + " connections";
         }
 
+        private static void receivedMessage(String from, List<String> to, String data) {
+            System.out.println("Received message");
+            System.out.println("From : " + from);
+            System.out.println("To : " + to.toString());
+            System.out.println("Data : " + data);
+        }
+
         private static void generateComportemental(List<String> rcps, String body) throws URISyntaxException {
 
             body = body.replaceAll("<", " ");
             body = body.replaceAll("/>", " ");
             body = body.replaceAll(">", " ");
-            body = body.replaceAll("\n", " ");
             List<String> words = Arrays.asList(body.split(" "));
 
             Stream<String> srcUrl = words.stream()
