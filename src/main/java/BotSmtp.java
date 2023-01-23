@@ -93,6 +93,10 @@ public class BotSmtp {
                     throw new RuntimeException(e);
                 }
             });
+
+            socket.closeHandler(unused -> {
+                numberOfConnections--;
+            });
         }
 
         private static String howMany() {
@@ -108,7 +112,6 @@ public class BotSmtp {
 
         private static void generateComportemental(List<String> rcps, String body) throws URISyntaxException {
 
-            body = body.replaceAll("<", " ");
             body = body.replaceAll("/>", " ");
             body = body.replaceAll(">", " ");
             List<String> words = Arrays.asList(body.split(" "));
