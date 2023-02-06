@@ -1,46 +1,91 @@
+import com.sun.mail.smtp.SMTPMessage;
+import com.sun.mail.smtp.SMTPTransport;
 import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.Test;
 
-import javax.mail.Message;
-import javax.mail.MessagingException;
-import javax.mail.Session;
-import javax.mail.Transport;
+import javax.mail.*;
 import javax.mail.internet.InternetAddress;
-import javax.mail.internet.MimeMessage;
+import javax.mail.internet.MimeBodyPart;
+import javax.mail.internet.MimeMultipart;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.ForkJoinPool;
 
 @QuarkusTest
 public class BotTest {
     @Test
-    public void testServer() throws MessagingException {
+    public void testServer() throws Exception {
 
-        String host = "localhost";
-        String to = "recipient+open+click@gmail.com";//change accordingly
+        List<Integer> tasks = new ArrayList<>();
+        for(int i=0; i<1; i++)
+            tasks.add(i, i);
 
-        //Get the session object
-        Properties props = new Properties();
-        props.put("mail.smtp.host", host);
-        props.put("mail.smtp.port", "1967");
-        props.put("mail.smtp.auth", "false");
+        Properties prop = new Properties();
+        prop.put("mail.smtp.auth", false);
+        prop.put("mail.smtp.starttls.enable", "false");
+        prop.put("mail.smtp.host", "localhost");
+        prop.put("mail.smtp.port", "1967");
+        prop.put("mail.smtp.ssl.trust", "");
+        prop.put("mail.smtp.sendpartial", true);
 
-        Session session = Session.getDefaultInstance(props);
+        Session session = Session.getInstance(prop);
+        Address[] addresses = InternetAddress.parse(
+                "to@gmail.com, to+open@gmail.com, to+click@gmail.com");
 
-        MimeMessage message = new MimeMessage(session);
+        Instant now = Instant.now();
+        System.out.println("BEGIN : " + now);
+
+        new ForkJoinPool(1024).submit(() -> {
+            tasks.stream().parallel().forEach(integer -> {
+                try {
+                    SMTPTransport smtpTransport = new SMTPTransport(session, new URLName("http://localhost:1967"));
+                    smtpTransport.connect();
+
+                    smtpTransport.setUseRset(true);
+                    smtpTransport.sendMessage(getMessage(session, addresses), addresses);
+                    smtpTransport.sendMessage(getMessage(session, addresses), addresses);
+                    smtpTransport.sendMessage(getMessage(session, addresses), addresses);
+                    smtpTransport.close();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }).get();
+
+        Instant end = Instant.now();
+        System.out.println("END : " + end);
+        System.out.println("Time : " + (end.getNano() - now.getNano()));
+    }
+
+    private static SMTPMessage getMessage(Session session, Address[] addresses) throws Exception {
+        SMTPMessage message = new SMTPMessage(session);
         message.setFrom(new InternetAddress("from@gmail.com"));
-        message.addRecipient(Message.RecipientType.TO, new InternetAddress(to));
-        message.setSubject("javatpoint");
-        message.setText("<html>" +
-                "This is simple program of sending email using JavaMail API" +
-                "<a href=\"img.domain.com/o/aezeza\" />" +
-                "<a href=\"img.domain.com/c/aezeza\" />" +
-                "<a href=\"img.domain.com/c/aezeza\" />" +
-                "</html>");
+        message.setRecipients(Message.RecipientType.TO, addresses);
+        message.setSubject("Mail Subject");
+        message.setSentDate(Date.from(Instant.now()));
 
-        //send the message
-        Transport.send(message);
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder = stringBuilder.append("<html>").append("\n");
+        stringBuilder = stringBuilder.append("<body>").append("\n");
+        stringBuilder = stringBuilder.append("This is my first email using JavaMailer").append("\n");
+        stringBuilder = stringBuilder.append("<a href=\"http://localhost:8089/tracking/o/\"/>").append("\n");
+        stringBuilder = stringBuilder.append("This is my first email using JavaMailer").append("\n");
+        stringBuilder = stringBuilder.append("<img src=\"http://localhost:8089/tracking/c/\"/>").append("\n");
+        stringBuilder = stringBuilder.append("</body>").append("\n");
+        stringBuilder = stringBuilder.append("</html>").append("\n");
+        MimeBodyPart mimeBodyPart = new MimeBodyPart();
+        mimeBodyPart.setText(stringBuilder.toString(), "utf-8");
 
-        System.out.println("message sent successfully...");
 
+        Multipart multipart = new MimeMultipart();
+        multipart.addBodyPart(mimeBodyPart);
+
+        message.setContent(multipart);
+
+        return message;
     }
 
 }

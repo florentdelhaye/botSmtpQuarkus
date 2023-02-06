@@ -16,7 +16,6 @@ public class TrackingServer {
         System.out.println("o");
         return "Hello from RESTEasy Reactive";
     }
-
     @GET
     @Path("/c")
     @ResponseStatus(200)
